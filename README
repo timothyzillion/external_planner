@@ -1,0 +1,17 @@
+This is an experiment.
+
+Originally started with Postgres 9.0, now using Postgres-9.1.1.
+
+The goal is to emit the postgres query-tree (parse tree) in a format
+that is useful to external programs, and to send the serialized
+query-tree out to an external program. The external program can send
+back an ERROR (which makes us plan as normal), or a serialized plan
+in which case we avoid the native Postgres planner and execute the
+provided plan.
+
+There are some security issues with writing things this way (a bad
+planner could send back plans which are valid but do harm).
+
+Essentially this is a framework for playing with query-planning;
+especially for playing with query-planning. Query-planning in other
+languages, or with non-postgres representations.
