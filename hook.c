@@ -39,6 +39,8 @@ extern PlannedStmt *remote_planner(Query *parse, int cursorOptions, ParamListInf
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+extern char *nodeToJsonString(void *obj);
+
 static bool remote_planner_connected = false;
 
 /* Retrieve planner, config and connect. */
@@ -72,6 +74,10 @@ remote_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
             remote_planner_connected = true;
         }
     }
+
+    parse_tree = nodeToJsonString(parse);
+    elog(LOG, "remote_planner_json: Query-tree: %s", parse_tree);
+    pfree(parse_tree);
 
     parse_tree = nodeToString(parse);
     parse_tree_len = strlen(parse_tree);

@@ -43,59 +43,58 @@
 
 /* Write the label for the node type */
 #define WRITE_NODE_TYPE(nodelabel) \
-    appendStringInfoString(str, nodelabel)
+    appendStringInfoString(str, "\"name\":\"" nodelabel "\"")
 
 /* Write an integer field (anything written as ":fldname %d") */
 #define WRITE_INT_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %d", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%d", node->fldname)
 
 /* Write an unsigned integer field (anything written as ":fldname %u") */
 #define WRITE_UINT_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %u", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%u", node->fldname)
 
 /* Write an OID field (don't hard-wire assumption that OID is same as uint) */
 #define WRITE_OID_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %u", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%u", node->fldname)
 
 /* Write a long-integer field */
 #define WRITE_LONG_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %ld", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%ld", node->fldname)
 
 /* Write a char field (ie, one ascii character) */
 #define WRITE_CHAR_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %c", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":\"%c\"", node->fldname)
 
 /* Write an enumerated-type field as an integer code */
 #define WRITE_ENUM_FIELD(fldname, enumtype) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %d", \
-                     (int) node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%d", node->fldname)
 
 /* Write a float field --- caller must give format to define precision */
 #define WRITE_FLOAT_FIELD(fldname,format) \
-    appendStringInfo(str, " :" CppAsString(fldname) " " format, node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":" format, node->fldname)
 
 /* Write a boolean field */
 #define WRITE_BOOL_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %s", \
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":\"%s\"", \
                      booltostr(node->fldname))
 
 /* Write a character-string (possibly NULL) field */
 #define WRITE_STRING_FIELD(fldname) \
-    (appendStringInfo(str, " :" CppAsString(fldname) " "), \
-     _outToken(str, node->fldname))
+    (appendStringInfo(str, ",\"" CppAsString(fldname) "\":\""), \
+     _outToken(str, node->fldname)); appendStringInfo(str, "\"")
 
 /* Write a parse location field (actually same as INT case) */
 #define WRITE_LOCATION_FIELD(fldname) \
-    appendStringInfo(str, " :" CppAsString(fldname) " %d", node->fldname)
+    appendStringInfo(str, ",\"" CppAsString(fldname) "\":%d", node->fldname)
 
 /* Write a Node field */
 #define WRITE_NODE_FIELD(fldname) \
-    (appendStringInfo(str, " :" CppAsString(fldname) " "), \
+    (appendStringInfo(str, ",\"" CppAsString(fldname) "\":"), \
      _outNode(str, node->fldname))
 
 /* Write a bitmapset field */
 #define WRITE_BITMAPSET_FIELD(fldname) \
-    (appendStringInfo(str, " :" CppAsString(fldname) " "), \
+    (appendStringInfo(str, "\"" CppAsString(fldname) "\":"), \
      _outBitmapset(str, node->fldname))
 
 
@@ -109,14 +108,13 @@ static void _outNode(StringInfo str, void *obj);
  *    Convert an ordinary string (eg, an identifier) into a form that
  *    will be decoded back to a plain token by read.c's functions.
  *
- *    If a null or empty string is given, it is encoded as "<>".
  */
 static void
 _outToken(StringInfo str, char *s)
 {
     if (s == NULL || *s == '\0')
     {
-        appendStringInfo(str, "<>");
+        appendStringInfo(str, "null");
         return;
     }
 
@@ -146,17 +144,28 @@ _outToken(StringInfo str, char *s)
 static void
 _outList(StringInfo str, List *node)
 {
+    int first = 1;
     ListCell   *lc;
 
-    appendStringInfoChar(str, '(');
+    appendStringInfoString(str, "{[\"type\":");
 
-    if (IsA(node, IntList))
+    if (IsA(node, IntList)) {
         appendStringInfoChar(str, 'i');
-    else if (IsA(node, OidList))
+    }
+    else if (IsA(node, OidList)) {
         appendStringInfoChar(str, 'o');
+    } else {
+        appendStringInfoString(str, "null");
+    }
+    appendStringInfoString(str, ",\"value\":[");
 
     foreach(lc, node)
     {
+        if (first) {
+            first = 0;
+        } else {
+            appendStringInfoChar(str, ',');
+        }
         /*
          * For the sake of backward compatibility, we emit a slightly
          * different whitespace format for lists of nodes vs. other types of
@@ -169,15 +178,15 @@ _outList(StringInfo str, List *node)
                 appendStringInfoChar(str, ' ');
         }
         else if (IsA(node, IntList))
-            appendStringInfo(str, " %d", lfirst_int(lc));
+            appendStringInfo(str, "%d", lfirst_int(lc));
         else if (IsA(node, OidList))
-            appendStringInfo(str, " %u", lfirst_oid(lc));
+            appendStringInfo(str, "%u", lfirst_oid(lc));
         else
             elog(ERROR, "unrecognized list node type: %d",
                  (int) node->type);
     }
 
-    appendStringInfoChar(str, ')');
+    appendStringInfoString(str, "]}");
 }
 
 /*
@@ -191,14 +200,21 @@ _outBitmapset(StringInfo str, Bitmapset *bms)
 {
     Bitmapset  *tmpset;
     int         x;
+    int first = 1;
 
-    appendStringInfoChar(str, '(');
-    appendStringInfoChar(str, 'b');
+    appendStringInfoString(str, "{\"type\":b,\"value\":");
+    appendStringInfoChar(str, '[');
     tmpset = bms_copy(bms);
-    while ((x = bms_first_member(tmpset)) >= 0)
-        appendStringInfo(str, " %d", x);
+    while ((x = bms_first_member(tmpset)) >= 0) {
+        if (first) {
+            appendStringInfo(str, "%d", x);
+            first = 0;
+        } else {
+            appendStringInfo(str, ",%d", x);
+        }
+    }
     bms_free(tmpset);
-    appendStringInfoChar(str, ')');
+    appendStringInfoString(str, "]}");
 }
 
 /*
@@ -207,6 +223,7 @@ _outBitmapset(StringInfo str, Bitmapset *bms)
 static void
 _outDatum(StringInfo str, Datum value, int typlen, bool typbyval)
 {
+    int first = 1;
     Size        length,
                 i;
     char       *s;
@@ -216,22 +233,34 @@ _outDatum(StringInfo str, Datum value, int typlen, bool typbyval)
     if (typbyval)
     {
         s = (char *) (&value);
-        appendStringInfo(str, "%u [ ", (unsigned int) length);
-        for (i = 0; i < (Size) sizeof(Datum); i++)
-            appendStringInfo(str, "%d ", (int) (s[i]));
-        appendStringInfo(str, "]");
+        appendStringInfo(str, "{\"size\":%u,\"value\":[", (unsigned int) length);
+        for (i = 0; i < (Size) sizeof(Datum); i++) {
+            if (first) {
+                first = 0;
+            } else {
+                appendStringInfo(str, ",");
+            }
+            appendStringInfo(str, "%d", (int) (s[i]));
+        }
+        appendStringInfo(str, "]}");
     }
     else
     {
         s = (char *) DatumGetPointer(value);
         if (!PointerIsValid(s))
-            appendStringInfo(str, "0 [ ]");
+            appendStringInfo(str, "{\"size\":0,\"value\":[ ]}");
         else
         {
-            appendStringInfo(str, "%u [ ", (unsigned int) length);
-            for (i = 0; i < length; i++)
-                appendStringInfo(str, "%d ", (int) (s[i]));
-            appendStringInfo(str, "]");
+            appendStringInfo(str, "{\"size\":%u,\"value\":[", (unsigned int) length);
+            for (i = 0; i < length; i++) {
+                if (first) {
+                    first = 0;
+                } else {
+                    appendStringInfo(str, ",");
+                }
+                appendStringInfo(str, "%d", (int) (s[i]));
+            }
+            appendStringInfo(str, "]}");
         }
     }
 }
@@ -927,9 +956,9 @@ _outConst(StringInfo str, Const *node)
     WRITE_BOOL_FIELD(constisnull);
     WRITE_LOCATION_FIELD(location);
 
-    appendStringInfo(str, " :constvalue ");
+    appendStringInfo(str, ",\"constvalue\":");
     if (node->constisnull)
-        appendStringInfo(str, "<>");
+        appendStringInfo(str, "null");
     else
         _outDatum(str, node->constvalue, node->constlen, node->constbyval);
 }
@@ -2188,7 +2217,7 @@ _outQuery(StringInfo str, Query *node)
         }
     }
     else
-        appendStringInfo(str, " :utilityStmt <>");
+        appendStringInfo(str, "\"utilityStmt\":null");
 
     WRITE_INT_FIELD(resultRelation);
     WRITE_NODE_FIELD(intoClause);
@@ -2347,7 +2376,9 @@ _outRangeTblEntry(StringInfo str, RangeTblEntry *node)
     WRITE_BOOL_FIELD(inFromCl);
     WRITE_UINT_FIELD(requiredPerms);
     WRITE_OID_FIELD(checkAsUser);
+    appendStringInfoChar(str, ',');
     WRITE_BITMAPSET_FIELD(selectedCols);
+    appendStringInfoChar(str, ',');
     WRITE_BITMAPSET_FIELD(modifiedCols);
 }
 
@@ -2665,7 +2696,7 @@ static void
 _outNode(StringInfo str, void *obj)
 {
     if (obj == NULL)
-        appendStringInfo(str, "<>");
+        appendStringInfo(str, "null");
     else if (IsA(obj, List) ||IsA(obj, IntList) || IsA(obj, OidList))
         _outList(str, obj);
     else if (IsA(obj, Integer) ||
@@ -3159,7 +3190,7 @@ _outNode(StringInfo str, void *obj)
  *     returns the ascii representation of the Node as a palloc'd string
  */
 char *
-nodeToString(void *obj)
+nodeToJsonString(void *obj)
 {
     StringInfoData str;
 
