@@ -147,13 +147,13 @@ _outList(StringInfo str, List *node)
     int first = 1;
     ListCell   *lc;
 
-    appendStringInfoString(str, "{[\"type\":");
+    appendStringInfoString(str, "{\"type\":");
 
     if (IsA(node, IntList)) {
-        appendStringInfoChar(str, 'i');
+        appendStringInfoString(str, "\"i\"");
     }
     else if (IsA(node, OidList)) {
-        appendStringInfoChar(str, 'o');
+        appendStringInfoString(str, "\"o\"");
     } else {
         appendStringInfoString(str, "null");
     }
@@ -202,7 +202,7 @@ _outBitmapset(StringInfo str, Bitmapset *bms)
     int         x;
     int first = 1;
 
-    appendStringInfoString(str, "{\"type\":b,\"value\":");
+    appendStringInfoString(str, "{\"type\":\"bms\",\"value\":");
     appendStringInfoChar(str, '[');
     tmpset = bms_copy(bms);
     while ((x = bms_first_member(tmpset)) >= 0) {
@@ -2193,7 +2193,7 @@ _outQuery(StringInfo str, Query *node)
     WRITE_ENUM_FIELD(commandType, CmdType);
     WRITE_ENUM_FIELD(querySource, QuerySource);
     WRITE_BOOL_FIELD(canSetTag);
-
+    appendStringInfoChar(str, ',');
     /*
      * Hack to work around missing outfuncs routines for a lot of the
      * utility-statement node types.  (The only one we actually *need* for
