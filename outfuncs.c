@@ -1113,8 +1113,6 @@ _outBoolExpr(StringInfo str, BoolExpr *node)
 {
     char       *opstr = NULL;
 
-    WRITE_NODE_TYPE("BOOLEXPR");
-
     /* do-it-yourself enum representation */
     switch (node->boolop)
     {
@@ -1128,8 +1126,11 @@ _outBoolExpr(StringInfo str, BoolExpr *node)
             opstr = "not";
             break;
     }
-    appendStringInfo(str, " :boolop ");
+
+    WRITE_NODE_TYPE("BOOLEXPR");
+    appendStringInfo(str, ",\"boolop\":\"");
     _outToken(str, opstr);
+    appendStringInfo(str, "\"");
 
     WRITE_NODE_FIELD(args);
     WRITE_LOCATION_FIELD(location);
